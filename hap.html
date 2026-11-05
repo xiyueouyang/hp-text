@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  霍格沃茨宿命人格测试
+  <style>
+    * { box-sizing: border-box; margin:0; padding:0; font-family: "Microsoft Yahei",sans-serif; }
+    body { 
+      background: #0b0c14; 
+      color:#e6e6e6; 
+      padding:20px; 
+      max-width:640px; 
+      margin:0 auto; 
+      min-height:100vh;
+      background-image: radial-gradient(circle at 50% 20%, #1a1c2e 0%, #0b0c14 70%);
+    }
+    .page { display:none; }
+    .page.active { display:block; }
+    .card { 
+      background: rgba(25,27,42,0.85); 
+      border:1px solid rgba(180,150,255,0.2);
+      border-radius:20px; 
+      padding:26px; 
+      box-shadow: 0 0 30px rgba(120,90,200,0.15);
+      backdrop-filter: blur(8px);
+    }
+    h2 { color:#d8c8ff; margin-bottom:12px; text-shadow:0 0 8px rgba(200,180,255,0.3); }
+    h3 { color:#e0d8f5; font-size:17px; line-height:1.6; margin-bottom:20px; }
+    h4 { color:#c9b8e8; margin:16px 0 8px; }
+    p { line-height:1.7; color:#d1cce0; font-size:15px; }
+    .tip { color:#b4a8d8; font-size:14px; margin:6px 0 16px; }
+    .btn { 
+      display:block; width:100%; 
+      border:none; 
+      background: linear-gradient(135deg,#4b3b82,#2c2352);
+      color:#f0ebff; 
+      padding:14px; 
+      border-radius:12px; 
+      margin:10px 0; 
+      font-size:16px; 
+      cursor:pointer; 
+      transition:0.25s;
+      border:1px solid rgba(190,170,255,0.25);
+    }
+    .btn:hover { 
+      background: linear-gradient(135deg,#5c4a99,#3b2e6b);
+      box-shadow:0 0 12px rgba(150,120,220,0.3);
+    }
+    .bar-row { margin:10px 0; }
+    .bar-wrap { height:16px; background:rgba(60,55,90,0.6); border-radius:999px; overflow:hidden; }
+    .bar { height:100%; background:linear-gradient(90deg,#a894e8,#d2c4ff); transition:0.7s; }
+    .near-item { padding:8px 0; color:#c9b8e8; border-bottom:1px solid rgba(180,160,240,0.15); }
+  </style>
+</head>
+<body>
+  <div id="introPage" class="page active">
+    <div class="card">
+      <h2>霍格沃茨宿命人格测试</h2>
+      <p id="introText"></p>
+      <button class="btn" onclick="startTest()">开启魔法宿命</button>
+    </div>
+  </div>
+
+  <div id="quizPage" class="page">
+    <div class="card">
+      <div class="tip">宿命试炼 <span id="qIndex"></span> / <span id="qTotal"></span></div>
+      <h3 id="qTitle"></h3>
+      <div id="optWrap"></div>
+    </div>
+  </div>
+
+  <div id="resultPage" class="page">
+    <div class="card">
+      <h2>你的魔法宿命：<span id="roleName"></span></h2>
+      <p id="roleDesc" class="tip"></p>
+      <h4>十二维魔法人格特质</h4>
+      <div id="barWrap"></div>
+      <h4>灵魂相近巫师</h4>
+      <div id="nearWrap"></div>
+      <button class="btn" onclick="restart()">重历魔法人生</button>
+    </div>
+  </div>
+
+<script>
+// 仅保留：3次打开次数锁（无时间锁）
+let openCount = Number(localStorage.getItem("hp_test_open_count") || 0);
+const maxOpen = 3;
+
+if (openCount >= maxOpen) {
+  document.body.innerHTML = `
+  <div style="padding:30px;text-align:center">
+    <h2 style="color:#d8c8ff">魔法入口已沉寂</h2>
+    <p style="color:#b4a8d8;margin-top:10px">你已耗尽本次试炼的全部机会（限3次）</p>
+    <p style="color:#998fc2;margin-top:8px">请重新购买，解锁全新魔法宿命试炼</p>
+  </div>`;
+} else {
+  openCount += 1;
+  localStorage.setItem("hp_test_open_count", openCount);
+}
+
+const testData = {
+  "intro": "一阵眩晕过后，你发现自己踏入了霍格沃茨的城堡。猫头鹰掠过窗前，壁炉里火焰跃动。回答下面的题目，看看这场奇妙穿越里，你将会成为哪一个角色。",
+  "explain": {
+    "courage": "狮焰勇气：你的灵魂镌刻格兰芬多烈火，直面黑暗、无惧强敌，是绝境里永不熄灭的冲锋本能，也是你人格最耀眼的锋芒。",
+    "wisdom": "星穹智识：你天生通晓魔法逻辑与人性规律，擅长推演、洞察隐秘真相，是团队里最清醒、最通透的智慧核心。",
+    "loyalty": "誓约忠贞：你重羁绊、守初心，认定的人与信念至死不渝，温柔且坚定，是所有人最值得托付后背的灵魂底色。",
+    "ambition": "权冕野心：你不甘平庸、自带格局傲骨，渴望登顶、掌控命运，拥有向上突破、挣脱桎梏的强大生命力。",
+    "empathy": "生灵共情：你拥有魔法界最珍稀的温柔感知，能共情万物、体恤脆弱，自带治愈黑暗、抚平伤痛的灵魂温度。",
+    "selfdiscipline": "戒律自持：你极度自律克制、沉心深耕，耐得住寂寞、守得住底线，是能沉淀出高阶实力的沉稳人格。",
+    "freedom": "旷野不羁：你厌恶束缚、拒绝规训驯化，灵魂向往自由旷野，随性坦荡、忠于自我，绝不活成别人的模板。",
+    "cunning": "蛇谋机敏：你心思缜密、擅长迂回破局，懂得隐忍布局、借力打力，是深藏不露、运筹帷幄的智者天赋。",
+    "gentle": "圣光温仁：你本性纯良柔软，待人宽厚悲悯，厌恶纷争伤害，自带治愈、包容、救赎他人的温柔内核。",
+    "pride": "巫师风骨：你坚守尊严底线、爱惜自我风骨，绝不卑微妥协、绝不苟且盲从，自带高贵独立的人格姿态。",
+    "adventure": "秘境探险：你天生好奇未知、痴迷禁忌与秘境，敢于探索无人踏足的真相，拥有永不枯竭的探索热血。",
+    "restrain": "沉渊隐忍：你擅长藏锋敛锐、隐忍蓄势，情绪深沉克制，遇事不张扬，静待时机一鸣惊人，城府沉稳内敛。"
+  },
+  "role": [
+    {
+      "id": "harry",
+      "name": "哈利·波特｜宿命勇者",
+      "desc": "你是天生背负宿命、却永远选择光明的灵魂勇者。你的人格最极致的特质，是绝境不屈、苦难向善。你一生被命运裹挟、被黑暗针对，见过人性最恶的算计与背叛，却始终保留纯粹赤诚。你不渴望高光、不追逐名利，唯独执念守护羁绊与正义。\n你的光明面：勇敢、真诚、重情、抗压极强，越是绝境越坚韧，永远愿意为他人挺身而出。\n你的阴暗软肋：极度心软、容易自我内耗，习惯独自扛下所有重压，从不示弱，常常默默消化孤独与创伤，害怕拖累所爱之人。\n别人眼里的你：耀眼、可靠、天生的领袖、永远站在光明一方。\n真实的你：敏感孤独、渴望平凡安稳，只是命运逼你不得不成为英雄。你是黑暗时代里，最温柔也最坚硬的微光。",
+      "vec": {"courage":28,"wisdom":14,"loyalty":26,"ambition":6,"empathy":20,"selfdiscipline":8,"freedom":16,"cunning":10,"gentle":16,"pride":16,"adventure":20,"restrain":12}
+    },
+    {
+      "id": "ron",
+      "name": "罗恩·韦斯莱｜人间暖阳",
+      "desc": "你是魔法世界最真实、最温暖的平凡赤诚者。你没有极致天赋、没有耀眼光环、没有野心欲望，却拥有最珍贵的纯粹本心与滚烫情义。你甘于做配角、甘于衬托他人，从不嫉妒高光，真诚为所爱之人喝彩。\n你的光明面：温柔踏实、重情重义、松弛通透、接地气，治愈所有紧绷、功利的人，是团队最温暖的底气。\n你的阴暗软肋：内心潜藏自卑敏感，容易自我怀疑、害怕不被重视，偶尔怯懦退缩、情绪直白外放，不懂伪装隐忍。\n别人眼里的你：乐观开朗、随和无害、永远热闹温暖。\n真实的你：渴望被看见、被肯定，看似大大咧咧，实则心思细腻、极度重情，是最值得托付一生的安稳存在。",
+      "vec": {"courage":14,"wisdom":8,"loyalty":26,"ambition":4,"empathy":14,"selfdiscipline":-2,"freedom":18,"cunning":12,"gentle":12,"pride":10,"adventure":18,"restrain":2}
+    },
+    {
+      "id": "hermione",
+      "name": "赫敏·格兰杰｜理性圣哲",
+      "desc": "你是天赋、自律、清醒三者极致融合的智者人格。你不信命运馈赠、不信侥幸奇迹，只信深耕与努力。你逻辑缜密、理智通透、坚守原则、极度可靠，是混乱局面里唯一的秩序与底气。\n你的光明面：聪慧自律、清醒独立、正义克制、做事极致靠谱，永远保持精进与清醒，不盲从、不浮躁。\n你的阴暗软肋：完美主义极强、容易紧绷内耗，过度理性压抑情绪，不懂松弛变通，偶尔固执强势、不懂示弱。\n别人眼里的你：天才、学霸、理智强大、无所不能。\n真实的你：极度要强、害怕平庸、害怕失控，看似坚硬无敌，实则也渴望被包容、被偏爱、不必时刻完美。",
+      "vec": {"courage":16,"wisdom":26,"loyalty":20,"ambition":14,"empathy":18,"selfdiscipline":26,"freedom":4,"cunning":16,"gentle":14,"pride":12,"adventure":10,"restrain":18}
+    },
+    {
+      "id": "ginny",
+      "name": "金妮·韦斯莱｜热烈风骨",
+      "desc": "你是鲜活热烈、风骨凌厉的独立女性人格。你挣脱怯懦过往、打破刻板标签，敢爱敢恨、洒脱果敢、不卑不亢。你外表明媚耀眼、生命力旺盛，内心坚韧锋利、绝不任人拿捏。\n你的光明面：勇敢洒脱、自信鲜活、爱憎分明、生命力极强，永远热烈、永远忠于自我。\n你的阴暗软肋：骨子里藏着敏感不安，在意他人眼光，情绪浓烈直接，容易爱恨极端，不擅长隐忍伪装。\n别人眼里的你：明媚耀眼、果敢洒脱、自信大方。\n真实的你：从泥泞里自愈成长，褪去胆怯、淬炼锋芒，热烈温柔与凌厉坚韧并存，是极具魅力的矛盾灵魂。",
+      "vec": {"courage":22,"wisdom":12,"loyalty":22,"ambition":12,"empathy":14,"selfdiscipline":4,"freedom":20,"cunning":16,"gentle":12,"pride":18,"adventure":20,"restrain":6}
+    },
+    {
+      "id": "twins",
+      "name": "弗雷德&乔治｜叛逆顽童",
+      "desc": "你是挣脱世俗桎梏、以热烈对抗荒芜的自由灵魂。你看透规则虚伪、厌恶刻板束缚，以玩笑、叛逆、热烈对抗沉闷世界。你看似玩世不恭、散漫随性，实则重情重义、赤诚滚烫。\n你的光明面：自由洒脱、乐观通透、灵动有趣、极具创造力，永远鲜活热烈、永不麻木世俗。\n你的阴暗软肋：抗拒约束、不耐枯燥、自律薄弱，习惯用玩笑掩盖认真，看似不羁实则害怕沉重、害怕遗憾。\n别人眼里的你：调皮叛逆、有趣自由、永远快乐。\n真实的你：通透清醒、早已看透世事平庸，用热烈对抗荒芜，用温柔守护同伴，是嬉皮外表、英雄内核。",
+      "vec": {"courage":22,"wisdom":12,"loyalty":24,"ambition":8,"empathy":10,"selfdiscipline":-12,"freedom":26,"cunning":22,"gentle":6,"pride":14,"adventure":24,"restrain":-16}
+    },
+    {
+      "id": "dumbledore",
+      "name": "邓布利多｜山海智者",
+      "desc": "你是胸藏山海、背负万物的极致通透人格。你看透人性善恶、通晓命运规律、包容世间百态。你拥有顶级智慧、深沉城府、悲悯温柔与远大格局，一生负重、一生隐忍、一生守护众生。\n你的光明面：通透豁达、悲悯包容、睿智沉稳、格局宏大，心怀苍生、温柔且强大。\n你的阴暗软肋：背负太多秘密与遗憾，过度隐忍克制、习惯性独自承担，思虑过重、终身自我博弈、自我煎熬。\n别人眼里的你：神圣、睿智、万能、通透。\n真实的你：满身遗憾、满心柔软，看透黑暗依然选择光明，看懂人性依然选择温柔，是最孤独的守护者。",
+      "vec": {"courage":18,"wisdom":28,"loyalty":16,"ambition":20,"empathy":22,"selfdiscipline":20,"freedom":8,"cunning":24,"gentle":24,"pride":18,"adventure":12,"restrain":26}
+    },
+    {
+      "id": "draco",
+      "name": "德拉科·马尔福｜傲骨贵骨",
+      "desc": "你是自带高贵风骨、挣扎于命运枷锁的矛盾灵魂。你生来背负家族荣光与枷锁，骄傲矜贵、野心灼灼、机敏善谋，外表锋芒冷冽、傲慢疏离，内心挣扎柔软、身不由己。\n你的光明面：自尊极强、风骨高贵、聪慧敏锐、向上进取，绝不甘于平庸、自带精英格局。\n你的阴暗软肋：傲娇拧巴、极度好胜、害怕落败、在意身份体面，内心自卑与自负交织，被世俗枷锁捆绑一生。\n别人眼里的你：傲慢、高冷、优越、刻薄。\n真实的你：身不由己、困于宿命与家族，本性不坏、善恶摇摆，骄傲是铠甲，脆弱是内核，是最让人心疼的矛盾贵族。",
+      "vec": {"courage":8,"wisdom":14,"loyalty":6,"ambition":26,"empathy":-4,"selfdiscipline":14,"freedom":6,"cunning":26,"gentle":-6,"pride":28,"adventure":8,"restrain":22}
+    },
+    {
+      "id": "hagrid",
+      "name": "鲁伯·海格｜生灵守护者",
+      "desc": "你是魔法世界最纯粹、最赤诚、最温柔的守护者人格。你不懂权谋算计、不懂人性险恶，内心质朴善良、热忱纯粹，一生偏爱万物生灵、温柔守护弱小，以真心待人、以善意渡世。\n你的光明面：纯粹温柔、赤诚宽厚、热爱万物、共情极强，善良坦荡、毫无心机、永远热忱柔软。\n你的阴暗软肋：心思单纯、容易轻信他人、不懂防备，粗线条外表下极度重情，容易被辜负、被利用。\n别人眼里的你：憨厚粗犷、大大咧咧、温和无害。\n真实的你：灵魂干净通透、心怀温柔山海，用最质朴的善意温暖魔法世界，是世间最珍贵的纯粹本心。",
+      "vec": {"courage":20,"wisdom":6,"loyalty":22,"ambition":-6,"empathy":28,"selfdiscipline":-4,"freedom":18,"cunning":-8,"gentle":26,"pride":6,"adventure":22,"restrain":-10}
+    },
+    {
+      "id": "buckbeak",
+      "name": "巴克比克｜傲骨自由灵",
+      "desc": "你是不驯于世俗、忠于尊严本心的自由生灵人格。你傲骨天成、自尊极强、自由桀骜、坦荡纯粹。你不懂圆滑世故、不懂卑微讨好，遵从天性、敬畏对等，热爱旷野长风、忠于自我灵魂。\n你的光明面：纯粹坦荡、自尊独立、热爱自由、真诚直白，风骨凛然、绝不谄媚依附。\n你的阴暗软肋：极度敏感自尊、记仇也记恩，无法忍受轻视冒犯，不懂妥协隐忍，随性不羁、抗拒束缚。\n别人眼里的你：高傲冷淡、难以亲近、随性自我。\n真实的你：干净通透、爱恨分明、本心赤诚，只忠于尊严与自由，是远离世俗污浊的纯粹灵魂。",
+      "vec": {"courage":20,"wisdom":4,"loyalty":12,"ambition":-8,"empathy":24,"selfdiscipline":-8,"freedom":28,"cunning":-4,"gentle":18,"pride":26,"adventure":26,"restrain":-14}
+    },
+    {
+      "id": "snape",
+      "name": "西弗勒斯·斯内普｜沉渊孤勇",
+      "desc": "你是藏锋于暗、深情隐忍、背负一生秘密的极致孤勇人格。你外表冷硬刻薄、疏离冷漠、自带锋芒，内心深情专一、忠诚绵长、隐忍负重。你一生藏爱、一生隐忍、一生背负黑暗与误解。\n你的光明面：智谋深沉、极度专一、隐忍坚韧、初心不渝，暗中守护、默默付出、从不张扬。\n你的阴暗软肋：性格阴郁偏执、不善表达、嘴硬心软、自我封闭，习惯性压抑情绪、独自煎熬、深陷执念。\n别人眼里的你：冷漠刻薄、阴沉古怪、难以相处。\n真实的你：全世界最深情隐忍的孤勇者，以恶名掩温柔，以冷漠藏赤诚，一生孤独、一生坚守、一生温柔。",
+      "vec": {"courage":16,"wisdom":20,"loyalty":22,"ambition":18,"empathy":8,"selfdiscipline":22,"freedom":-4,"cunning":28,"gentle":4,"pride":20,"adventure":4,"restrain":28}
+    },
+    {
+      "id": "sirius",
+      "name": "小天狼星｜赤诚反叛",
+      "desc": "你是挣脱虚伪世俗、热烈赤诚、忠于本心的反叛理想人格。你唾弃虚伪规则、厌恶家族桎梏、不屑世俗功利，一生热烈坦荡、重情重义、自由浪漫。你宁愿坠入黑暗，也绝不妥协庸俗。\n你的光明面：赤诚热烈、重情重义、勇敢反叛、浪漫自由，忠于初心、永不世俗麻木。\n你的阴暗软肋：随性不羁、耐性薄弱、过于感性，为爱与友情不顾一切，容易冲动、不懂保全自身。\n别人眼里的你：叛逆洒脱、自由浪漫、桀骜不驯。\n真实的你：灵魂纯粹滚烫、极致重情，挣脱所有枷锁只为活成自己，是黑暗年代最自由赤诚的一束火光。",
+      "vec": {"courage":26,"wisdom":12,"loyalty":28,"ambition":6,"empathy":16,"selfdiscipline":-6,"freedom":24,"cunning":18,"gentle":14,"pride":20,"adventure":22,"restrain":-8}
+    },
+    {
+      "id": "luna",
+      "name": "卢娜·洛夫古德｜梦境巫灵",
+      "desc": "你是游离世俗、通透温柔、自带灵气的治愈梦境人格。你看透世俗浮躁、不迎合、不盲从、不攀比，内心干净纯粹、通透温柔。你能看见别人看不见的真相与温柔，共情孤独、包容异类、治愈荒芜。\n你的光明面：温柔通透、灵气干净、包容治愈、心态豁达，永远纯粹、永远心怀美好。\n你的阴暗软肋：过于疏离世俗、容易被误解孤立，思维跳脱、不爱合群，偶尔自我沉浸、脱离现实。\n别人眼里的你：古怪空灵、不食人间烟火。\n真实的你：最清醒通透的智者，看似天真古怪，实则早已看透世俗虚妄，以温柔本心，治愈世间所有孤独。",
+      "vec": {"courage":12,"wisdom":20,"loyalty":16,"ambition":-4,"empathy":26,"selfdiscipline":6,"freedom":22,"cunning":8,"gentle":24,"pride":14,"adventure":20,"restrain":6}
+    }
+  ],
+  "data": [
+    {"title":"深夜独自穿行霍格沃茨幽暗长廊，远处传来诡异低语，你的第一反应是？","options":[{"text":"持杖前行，直面未知诡异","delta":{"courage":2,"adventure":2,"restrain":-1}},{"text":"隐蔽观察、预判风险再行动","delta":{"wisdom":2,"restrain":2,"freedom":-1}},{"text":"寻找同伴结伴，绝不独行冒险","delta":{"loyalty":2,"gentle":1,"ambition":-1}},{"text":"迅速折返寝室，规避未知危险","delta":{"selfdiscipline":2,"pride":1,"adventure":-2}}]},
+    {"title":"你意外获得一本尘封的禁忌黑魔法笔记，你会？","options":[{"text":"隐秘钻研，获取强大力量","delta":{"ambition":2,"cunning":2,"gentle":-1}},{"text":"克制好奇，上交教授杜绝风险","delta":{"selfdiscipline":2,"pride":2,"freedom":-1}},{"text":"浅读一二，权衡利弊再决定","delta":{"wisdom":2,"restrain":2,"adventure":-1}},{"text":"毫无兴趣，直接置之不理","delta":{"gentle":2,"empathy":1,"ambition":-2}}]},
+    {"title":"禁林深处传来魔法生灵哀鸣，四周雾气幽暗危险，你会？","options":[{"text":"深入禁林探寻、救助生灵","delta":{"empathy":3,"adventure":2,"selfdiscipline":-2}},{"text":"远距离观察，判断危险程度","delta":{"wisdom":2,"restrain":2,"courage":-1}},{"text":"寻找海格或教授协助救援","delta":{"loyalty":2,"gentle":2,"ambition":-1}},{"text":"恪守校规，远离禁林禁忌","delta":{"selfdiscipline":3,"pride":1,"adventure":-2}}]},
+    {"title":"课堂上众人嘲笑一位孤僻古怪的同学，你会？","options":[{"text":"当众制止，维护对方尊严","delta":{"courage":2,"pride":2,"cunning":-1}},{"text":"沉默旁观，不参与非议","delta":{"restrain":2,"wisdom":1,"freedom":-1}},{"text":"私下温柔安抚、陪伴对方","delta":{"gentle":3,"empathy":2,"ambition":-1}},{"text":"顺势融入氛围避免孤立自己","delta":{"cunning":2,"ambition":1,"loyalty":-2}}]},
+    {"title":"你掌握一门独一无二的高阶魔咒，旁人无人精通，你会？","options":[{"text":"私藏底牌，作为关键制胜手段","delta":{"cunning":3,"restrain":2,"empathy":-1}},{"text":"深耕钻研，彻底吃透魔法原理","delta":{"wisdom":3,"selfdiscipline":2,"freedom":-1}},{"text":"分享挚友，共同精进成长","delta":{"loyalty":3,"gentle":1,"pride":-1}},{"text":"随性使用，当作趣味玩乐消遣","delta":{"freedom":3,"adventure":1,"selfdiscipline":-2}}]},
+    {"title":"面临重要魔法决斗，对手强大且手段隐秘，你会？","options":[{"text":"正面迎战，凭勇气冲破压制","delta":{"courage":3,"pride":1,"gentle":-1}},{"text":"推演破绽，用智谋迂回破局","delta":{"cunning":3,"wisdom":2,"freedom":-1}},{"text":"稳守防御，优先保全自身","delta":{"restrain":2,"selfdiscipline":2,"adventure":-1}},{"text":"点到为止，不愿伤害他人","delta":{"gentle":3,"empathy":2,"ambition":-1}}]},
+    {"title":"你最渴望拥有的魔法天赋是？","options":[{"text":"无匹战力，凌驾众生的力量","delta":{"ambition":3,"courage":2,"gentle":-1}},{"text":"洞悉一切，看透人心与真相","delta":{"wisdom":3,"cunning":2,"freedom":-1}},{"text":"治愈万物，抚平伤痛与黑暗","delta":{"gentle":3,"empathy":2,"ambition":-2}},{"text":"绝对自由，不受任何规则束缚","delta":{"freedom":3,"adventure":2,"restrain":-1}}]},
+    {"title":"团队任务队友摆烂推诿，所有重压落于你身，你会？","options":[{"text":"强势统筹，强行带团队完成最优结果","delta":{"ambition":2,"courage":2,"gentle":-1}},{"text":"冷静兜底，独自高质量完成","delta":{"wisdom":2,"selfdiscipline":3,"freedom":-1}},{"text":"温柔沟通，耐心劝说同伴配合","delta":{"gentle":2,"empathy":2,"pride":-1}},{"text":"放弃强求，随团队一同摆烂","delta":{"freedom":2,"cunning":1,"loyalty":-2}}]},
+    {"title":"深夜独处城堡塔顶，你更享受哪种心境？","options":[{"text":"畅想未来，渴望登顶变强","delta":{"ambition":2,"adventure":1,"gentle":-1}},{"text":"复盘过往，沉淀自我心智","delta":{"wisdom":2,"restrain":2,"freedom":-1}},{"text":"静享安宁，与自我温柔和解","delta":{"gentle":2,"empathy":2,"courage":-1}},{"text":"肆意放空，挣脱所有束缚","delta":{"freedom":3,"pride":1,"selfdiscipline":-1}}]},
+    {"title":"有人刻意抹黑你的名声、散播谣言，你会？","options":[{"text":"正面回击，捍卫自我风骨","delta":{"pride":3,"courage":2,"gentle":-1}},{"text":"隐忍蓄力，用实力粉碎流言","delta":{"restrain":3,"wisdom":2,"freedom":-1}},{"text":"淡然释怀，不屑与人纷争","delta":{"gentle":3,"empathy":1,"ambition":-1}},{"text":"巧妙反制，让对方自食其果","delta":{"cunning":3,"freedom":1,"selfdiscipline":-2}}]},
+    {"title":"发现城堡一间从未有人涉足的禁忌密室，你会？","options":[{"text":"立刻探秘，解锁尘封秘密","delta":{"adventure":3,"freedom":2,"restrain":-2}},{"text":"标记记录，谨慎研究风险","delta":{"wisdom":2,"cunning":2,"courage":-1}},{"text":"告知同伴，共同探索见证","delta":{"loyalty":3,"empathy":1,"pride":-1}},{"text":"置之不理，远离一切禁忌","delta":{"selfdiscipline":2,"restrain":2,"adventure":-3}}]},
+    {"title":"你对待命运宿命的态度是？","options":[{"text":"逆流而上，亲手改写宿命","delta":{"courage":2,"ambition":2,"restrain":-1}},{"text":"运筹帷幄，顺势掌控命运","delta":{"wisdom":2,"cunning":2,"freedom":-1}},{"text":"温柔接纳，善待所有际遇","delta":{"gentle":2,"empathy":2,"courage":-1}},{"text":"随心而行，不受宿命捆绑","delta":{"freedom":2,"adventure":2,"selfdiscipline":-1}}]},
+    {"title":"挚友犯错触犯校规即将受重罚，你会？","options":[{"text":"挺身而出，为挚友担责","delta":{"loyalty":3,"courage":2,"restrain":-1}},{"text":"搜集证据，尽力减免责罚","delta":{"wisdom":2,"cunning":2,"freedom":-1}},{"text":"陪伴安抚，陪对方共渡难关","delta":{"gentle":3,"empathy":2,"ambition":-1}},{"text":"理性旁观，不违规牵连自己","delta":{"selfdiscipline":3,"restrain":2,"loyalty":-2}}]},
+    {"title":"魔法部新规束缚你的自由与喜好，你会？","options":[{"text":"勇敢发声，质疑不合理规则","delta":{"courage":2,"pride":2,"restrain":-1}},{"text":"寻找漏洞，巧妙规避束缚","delta":{"cunning":3,"freedom":2,"selfdiscipline":-1}},{"text":"理性理解规则背后深意","delta":{"wisdom":2,"selfdiscipline":2,"adventure":-1}},{"text":"默默遵从，不争不辩安稳度日","delta":{"restrain":2,"gentle":1,"courage":-1}}]},
+    {"title":"你获得隐身斗篷，最想做的事是？","options":[{"text":"探秘所有城堡禁忌秘境","delta":{"adventure":3,"freedom":2,"selfdiscipline":-2}},{"text":"暗中观察，洞悉所有人真实面目","delta":{"wisdom":2,"cunning":2,"gentle":-1}},{"text":"守护弱小，安抚受伤生灵","delta":{"empathy":3,"gentle":2,"ambition":-1}},{"text":"绝不滥用，仅留危急时刻自保","delta":{"selfdiscipline":3,"restrain":2,"freedom":-1}}]},
+    {"title":"你心中最强魔法的真谛是？","options":[{"text":"战胜黑暗的绝对力量","delta":{"ambition":2,"courage":2,"gentle":-1}},{"text":"洞悉万物的终极智慧","delta":{"wisdom":3,"selfdiscipline":2,"freedom":-1}},{"text":"守护羁绊的温柔救赎","delta":{"gentle":3,"empathy":2,"ambition":-2}},{"text":"挣脱桎梏的绝对自由","delta":{"freedom":3,"adventure":2,"restrain":-1}}]},
+    {"title":"面对他人的示弱与脆弱，你通常？","options":[{"text":"温柔包容，耐心治愈陪伴","delta":{"gentle":3,"empathy":2,"pride":-1}},{"text":"理性分析，给出解决办法","delta":{"wisdom":2,"selfdiscipline":2,"freedom":-1}},{"text":"共情心疼，默默守护支撑","delta":{"loyalty":2,"empathy":2,"ambition":-1}},{"text":"保持距离，避免情绪拖累","delta":{"cunning":2,"restrain":2,"courage":-1}}]},
+    {"title":"重要试炼前夕，你的状态是？","options":[{"text":"全力备战，力求登顶最优","delta":{"ambition":2,"courage":2,"gentle":-1}},{"text":"推演全局，制定万全对策","delta":{"wisdom":3,"cunning":2,"freedom":-1}},{"text":"沉淀心绪，稳住自身状态","delta":{"restrain":2,"selfdiscipline":2,"adventure":-1}},{"text":"松弛自在，陪伴好友放松","delta":{"loyalty":3,"freedom":1,"pride":-1}}]},
+    {"title":"你更厌恶哪种人性特质？","options":[{"text":"懦弱退缩、不敢直面困境","delta":{"courage":2,"pride":2,"gentle":-1}},{"text":"浮躁浅薄、不思精进成长","delta":{"wisdom":2,"selfdiscipline":2,"freedom":-1}},{"text":"冷漠自私、伤害弱小生灵","delta":{"gentle":2,"empathy":3,"ambition":-1}},{"text":"刻板束缚、禁锢他人自由","delta":{"freedom":3,"adventure":2,"restrain":-1}}]},
+    {"title":"拥有预知未来能力，你会用来？","options":[{"text":"改写命运，谋取最优人生格局","delta":{"ambition":3,"cunning":2,"gentle":-1}},{"text":"钻研规律，通晓命运真相","delta":{"wisdom":3,"selfdiscipline":2,"freedom":-1}},{"text":"规避灾祸，守护所爱之人","delta":{"loyalty":3,"empathy":2,"adventure":-1}},{"text":"顺其自然，不窥探天命","delta":{"restrain":2,"gentle":2,"ambition":-1}}]},
+    {"title":"你最向往的巫师人生底色是？","options":[{"text":"锋芒万丈，世人敬畏敬仰","delta":{"ambition":3,"pride":2,"gentle":-1}},{"text":"智识浩瀚，通透万事万物","delta":{"wisdom":3,"selfdiscipline":2,"freedom":-1}},{"text":"温柔纯粹，守护温暖与善意","delta":{"gentle":3,"empathy":2,"ambition":-2}},{"text":"自由不羁，一生随性坦荡","delta":{"freedom":3,"adventure":2,"restrain":-1}}]},
+    {"title":"遭遇误解与全员偏见，你会？","options":[{"text":"坦荡自证，坚守本心风骨","delta":{"pride":2,"courage":2,"restrain":-1}},{"text":"沉默隐忍，静待真相浮现","delta":{"restrain":3,"wisdom":2,"freedom":-1}},{"text":"温柔释怀，不与世人争辩","delta":{"gentle":3,"empathy":1,"ambition":-1}},{"text":"转身离去，不屑合群自证","delta":{"freedom":2,"cunning":1,"loyalty":-1}}]},
+    {"title":"可以选择一种魔法伙伴，你会选？","options":[{"text":"傲骨浴火、忠贞护主的凤凰","delta":{"pride":2,"courage":2,"gentle":-1}},{"text":"聪慧通透、洞悉秘密的猫头鹰","delta":{"wisdom":2,"selfdiscipline":2,"freedom":-1}},{"text":"温柔治愈、共情万物的独角兽","delta":{"empathy":3,"gentle":2,"ambition":-1}},{"text":"自由桀骜、翱翔天际的鹰马","delta":{"freedom":3,"adventure":2,"selfdiscipline":-1}}]},
+    {"title":"小组出现功利投机、抢占成果的队友，你会？","options":[{"text":"正面揭穿，守住公平底线","delta":{"courage":2,"pride":2,"gentle":-1}},{"text":"暗中防备，规避对方算计","delta":{"cunning":3,"restrain":2,"freedom":-1}},{"text":"包容谅解，尽量和平共处","delta":{"gentle":2,"empathy":2,"ambition":-1}},{"text":"淡然远离，不参与纷争","delta":{"freedom":2,"wisdom":1,"selfdiscipline":-1}}]},
+    {"title":"你对待执念与遗憾的态度是？","options":[{"text":"执念到底，绝不轻易放下","delta":{"ambition":2,"loyalty":2,"freedom":-1}},{"text":"理性释怀，向前看不沉溺过往","delta":{"wisdom":2,"selfdiscipline":2,"restrain":-1}},{"text":"温柔接纳，与遗憾和解共生","delta":{"gentle":3,"empathy":2,"courage":-1}},{"text":"洒脱放下，不被过往捆绑","delta":{"freedom":3,"adventure":1,"pride":-1}}]},
+    {"title":"进入布满未知诅咒的古代魔法遗迹，你重点关注？","options":[{"text":"失传禁术、顶级魔法力量","delta":{"ambition":2,"adventure":3,"selfdiscipline":-1}},{"text":"符文规律、历史真相逻辑","delta":{"wisdom":3,"selfdiscipline":2,"freedom":-1}},{"text":"被困生灵、残存温柔气息","delta":{"empathy":3,"gentle":2,"ambition":-1}},{"text":"无拘探索，享受未知冒险","delta":{"freedom":3,"adventure":1,"restrain":-2}}]},
+    {"title":"你最无法接受的自我状态是？","options":[{"text":"懦弱妥协、丧失风骨尊严","delta":{"pride":3,"courage":2,"gentle":-1}},{"text":"愚钝浅薄、停滞不前平庸","delta":{"wisdom":3,"selfdiscipline":2,"freedom":-1}},{"text":"冷漠麻木、丢失温柔本心","delta":{"gentle":3,"empathy":2,"ambition":-1}},{"text":"束缚压抑、失去自由自我","delta":{"freedom":3,"adventure":2,"restrain":-1}}]},
+    {"title":"隐秘黑暗势力向你抛出橄榄枝，你会？","options":[{"text":"断然拒绝，坚守光明底线","delta":{"pride":2,"gentle":2,"ambition":-1}},{"text":"暗中观望，权衡利弊再抉择","delta":{"wisdom":2,"restrain":3,"freedom":-1}},{"text":"绝不合群，坚守自我立场","delta":{"freedom":2,"courage":1,"loyalty":-1}},{"text":"利弊优先，有利则顺势接纳","delta":{"ambition":3,"cunning":2,"selfdiscipline":-2}}]},
+    {"title":"你希望被魔法世界如何铭记？","options":[{"text":"无畏黑暗、坚守正义的勇者","delta":{"courage":3,"pride":2,"gentle":-1}},{"text":"通晓真理、启迪世人的智者","delta":{"wisdom":3,"selfdiscipline":2,"freedom":-1}},{"text":"温柔赤诚、守护众生的善人","delta":{"gentle":3,"empathy":2,"ambition":-1}},{"text":"忠于自我、肆意坦荡的行者","delta":{"freedom":3,"adventure":2,"restrain":-1}}]},
+    {"title":"日常独处时，你的精神状态更偏向？","options":[{"text":"复盘精进、默默变强蓄力","delta":{"ambition":2,"selfdiscipline":2,"freedom":-1}},{"text":"沉思通透、梳理内心秩序","delta":{"wisdom":2,"restrain":2,"courage":-1}},{"text":"温柔自愈、安抚自我情绪","delta":{"gentle":3,"empathy":2,"pride":-1}},{"text":"放空肆意、彻底挣脱束缚","delta":{"freedom":3,"adventure":1,"selfdiscipline":-1}}]},
+    {"title":"面对未知黑暗与无尽风险，你的本能是？","options":[{"text":"主动突破，冲破黑暗桎梏","delta":{"courage":2,"adventure":2,"restrain":-1}},{"text":"冷静布局，掌控全局局势","delta":{"wisdom":2,"cunning":2,"freedom":-1}},{"text":"温柔包容，接纳所有未知","delta":{"gentle":2,"empathy":2,"courage":-1}},{"text":"随心而行，不受恐惧裹挟","delta":{"freedom":2,"pride":1,"selfdiscipline":-1}}]}
+  ]
+};
+
+let score = {};
+let currentQ = 0;
+const dims = Object.keys(testData.explain);
+
+function initScore(){
+  dims.forEach(k=>score[k]=0);
+}
+function switchPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(name).classList.add('active');
+}
+function startTest(){
+  initScore();
+  currentQ = 0;
+  document.getElementById('introText').innerText = testData.intro;
+  renderQ();
+  switchPage('quizPage');
+}
+function renderQ(){
+  const q = testData.data[currentQ];
+  document.getElementById('qIndex').innerText = currentQ+1;
+  document.getElementById('qTotal').innerText = testData.data.length;
+  document.getElementById('qTitle').innerText = q.title;
+  const wrap = document.getElementById('optWrap');
+  wrap.innerHTML = '';
+  q.options.forEach(opt=>{
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.innerText = opt.text;
+    btn.onclick = ()=>{
+      for(const d in opt.delta) score[d] += opt.delta[d];
+      currentQ++;
+      if(currentQ >= testData.data.length){
+        showResult();
+      }else{
+        renderQ();
+      }
+    }
+    wrap.appendChild(btn);
+  })
+}
+function dist(vecA, vecB){
+  let s = 0;
+  for(const k of dims){
+    const a = vecA[k]||0;
+    const b = vecB[k]||0;
+    s += (a-b)*(a-b);
+  }
+  return Math.sqrt(s);
+}
+function showResult(){
+  let list = testData.role.map(r=>({...r, d:dist(score, r.vec)}));
+  list.sort((a,b)=>a.d - b.d);
+  const top = list[0];
+  document.getElementById('roleName').innerText = top.name;
+  document.getElementById('roleDesc').innerText = top.desc;
+
+  const barWrap = document.getElementById('barWrap');
+  barWrap.innerHTML = '';
+  const maxVal = 30;
+  dims.forEach(key=>{
+    const v = score[key];
+    const pct = Math.max(0, Math.min(100, ((v + 15) / (maxVal+15)) * 100));
+    const div = document.createElement('div');
+    div.className = 'bar-row';
+    div.innerHTML = `<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px;color:#c9b8e8"><span>${testData.explain[key].split('：')[0]}</span><span>${v}</span></div><div class="bar-wrap"><div class="bar" style="width:${pct}%"></div></div>`;
+    barWrap.appendChild(div);
+  })
+
+  const nearWrap = document.getElementById('nearWrap');
+  nearWrap.innerHTML = '';
+  for(let i=1;i<4;i++){
+    const item = list[i];
+    const d = document.createElement('div');
+    d.className = "near-item";
+    d.innerText = item.name;
+    nearWrap.appendChild(d);
+  }
+  switchPage('resultPage');
+}
+function restart(){
+  switchPage('introPage');
+}
+document.getElementById('introText').innerText = testData.intro;
+</script>
+</body>
+</html>
